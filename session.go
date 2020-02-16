@@ -31,18 +31,9 @@ func (s *Stream) Set(c net.Conn, timeout int) {
 	s.Reader = textproto.NewReader(bufio.NewReader(io.LimitReader(c, 1000)))
 }
 
-type Config struct {
-	// Present a fake continued-line banner to fool spam clients into a tarpit
-	Tarpit220 int
-	TarpitBanner string
-}
-
-var DefaultConfig = &Config{}
-
 // One currently relayed session. You have to set up Server and Client streams up front before calling MITM.
 type Session struct {
-	*Config
-	Tarpitted bool
+	Tarpit int
 	Server, Client Stream
 }
 
@@ -50,7 +41,6 @@ type Session struct {
 func (s *Stream) ReadLine() (line string) {
 	s.SetReadDeadline(time.Now().Add(s.Timeout))
 	line, err := s.Reader.ReadLine()
-	log.Println("got",line,len(line),err)
 	if err != nil {
 		panic(err)
 	}
@@ -125,9 +115,6 @@ func (s *Stream) SendReply(code int, lns []string) {
 }
 
 func (s *Session) MITM() {
-	if s.Config == nil {
-		s.Config = DefaultConfig
-	}
 	defer func() {
 		err := recover()
 		if err != nil {
@@ -143,12 +130,12 @@ func (s *Session) MITM() {
 
 		switch reply {
 		case 220:
-			if s.Tarpit220 > 0 {
+			if s.Tarpit > 0 {
 				for _, l := range lines {
 					s.Client.SendLine("220-" + l)
 				}
 				var b[1]byte
-				s.Client.SetReadDeadline(time.Now().Add(time.Duration(s.Tarpit220) * time.Second))
+				s.Client.SetReadDeadline(time.Now().Add(time.Duration(s.Tarpit) * time.Second))
 				got, err := s.Client.Conn.Read(b[:])
 				if got > 0 && err == nil {
 					s.Client.SetReadDeadline(time.Time{})
