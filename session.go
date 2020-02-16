@@ -152,7 +152,7 @@ func (s *Session) MITM() {
 
 			for i := 0; i < len(lines); i++ {
 				v := lines[i]
-				log.Println(v)
+				//log.Println(v)
 				if i > 0 && (v == "STARTTLS" || v == "PIPELINING" || v == "CHUNKING" || v == "REQUIRETLS") {
 					copy(lines[i:], lines[i+1:])
 					lines = lines[:len(lines)-1]
@@ -163,6 +163,7 @@ func (s *Session) MITM() {
 		case 334:
 			s.Client.SendReply(reply, lines)
 			s.Server.SendLine(s.Client.ReadLine())
+			continue
 		case 354:
 			s.Client.SendReply(reply, lines)
 			for {
@@ -172,6 +173,7 @@ func (s *Session) MITM() {
 					break
 				}
 			}
+			continue
 		default:
 			s.Client.SendReply(reply, lines)
 			if reply == 221 {
