@@ -38,7 +38,6 @@ type Config struct {
 	// Present a fake continued-line banner to fool spam clients into a tarpit
 	Tarpit220 int
 	TarpitBanner string
-	NoTLS bool
 }
 
 var DefaultConfig = &Config{}
@@ -166,13 +165,14 @@ func (s *Session) MITM() {
 				s.Client.SendReply(reply, lines)
 			}
 		case 250:
-			if s.NoTLS {
-				for i, v := range lines {
-					if i > 0 && v == "STARTTLS" {
-						copy(lines[i:], lines[i+1:])
-						lines = lines[:len(lines)-1]
-						break
-					}
+
+			for i := 0; i < len(lines); i++ {
+				v := lines[i]
+				log.Println(v)
+				if i > 0 && (v == "STARTTLS" || v == "PIPELINING" || v == "CHUNKING" || v == "REQUIRETLS") {
+					copy(lines[i:], lines[i+1:])
+					lines = lines[:len(lines)-1]
+					i--
 				}
 			}
 			s.Client.SendReply(reply, lines)
@@ -190,11 +190,15 @@ func (s *Session) MITM() {
 			}
 		default:
 			s.Client.SendReply(reply, lines)
+			if reply == 221 {
+				return
+			}
 		}
+nextCommand:
 		cmd, arg := s.Client.ReadCommand()
-		if s.NoTLS && cmd == "STARTTLS" {
+		if cmd == "STARTTLS" {
 			s.Client.SendLine("454 TLS not available")
-			continue
+			goto nextCommand
 		}
 		s.Server.SendCommand(cmd, arg)
 	}
