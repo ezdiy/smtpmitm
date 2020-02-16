@@ -10,7 +10,7 @@ import "github.com/ezdiy/smtpmitm"
 func main() {
 	l, _ := net.Listen("tcp", ":25")
 	cfg := smtpmitm.Config{
-		Tarpit220:      5,
+		Tarpit220:      0,
 		NoTLS:          true,
 		TarpitBanner:   "$ ESMTP Postfix",
 	}

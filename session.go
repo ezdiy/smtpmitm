@@ -29,9 +29,9 @@ func (s *Stream) Set(c net.Conn, timeout int) {
 		s.Timeout = time.Duration(timeout) * time.Second
 	}
 	s.Conn = c
-	s.LR.R = c
-	s.LR.N = 1000
-	s.Reader = textproto.NewReader(bufio.NewReader(&s.LR))
+	//s.LR.R = c
+	//s.LR.N = 1000
+	s.Reader = textproto.NewReader(bufio.NewReader(c))
 }
 
 type Config struct {
@@ -54,6 +54,7 @@ type Session struct {
 func (s *Stream) ReadLine() (line string) {
 	s.SetReadDeadline(time.Now().Add(s.Timeout))
 	line, err := s.Reader.ReadLine()
+	log.Println("got",line,len(line),err)
 	if err != nil {
 		panic(err)
 	}
@@ -139,34 +140,31 @@ func (s *Session) MITM() {
 		s.Server.Close()
 		s.Client.Close()
 	}()
-	if s.Tarpit220 > 0 {
-		banner := s.TarpitBanner
-		if strings.Contains(banner, "$") {
-			ips := s.Server.RemoteAddr().(*net.TCPAddr).IP.String()
-			names, _ := net.LookupAddr(ips)
-			if len(names) > 0 {
-				ips = strings.TrimRight(names[0], ".")
-			}
-			banner = strings.Replace(banner, "$", ips, 1)
-		}
-		s.Client.SendLine("220-" + banner)
-		var b[1]byte
-		s.Client.SetReadDeadline(time.Now().Add(time.Duration(s.Tarpit220) * time.Second))
-		got, err := s.Client.Conn.Read(b[:])
-		if got > 0 && err == nil {
-			s.Client.SetReadDeadline(time.Time{})
-			s.Server.Close()
-			// got data, enter the tarpit
-			io.Copy(ioutil.Discard, s.Client.Conn)
-			return
-		}
-	}
 
 	// Now enter the command loop
 	for {
 		reply, lines := s.Server.ReadReply()
 
 		switch reply {
+		case 220:
+			if s.Tarpit220 > 0 {
+				for _, l := range lines {
+					s.Client.SendLine("220-" + l)
+				}
+				var b[1]byte
+				s.Client.SetReadDeadline(time.Now().Add(time.Duration(s.Tarpit220) * time.Second))
+				got, err := s.Client.Conn.Read(b[:])
+				if got > 0 && err == nil {
+					s.Client.SetReadDeadline(time.Time{})
+					s.Server.Close()
+					// got premature data from spammer, enter the tarpit
+					io.Copy(ioutil.Discard, s.Client.Conn)
+					return
+				}
+				s.Client.SendLine("220 ")
+			} else {
+				s.Client.SendReply(reply, lines)
+			}
 		case 250:
 			if s.NoTLS {
 				for i, v := range lines {
