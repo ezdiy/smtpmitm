@@ -17,7 +17,6 @@ var DefaultTimeout = time.Duration(30) * time.Second
 
 type Stream struct {
 	*textproto.Reader
-	LR io.LimitedReader
 	net.Conn
 	Timeout time.Duration
 	*log.Logger
@@ -29,9 +28,7 @@ func (s *Stream) Set(c net.Conn, timeout int) {
 		s.Timeout = time.Duration(timeout) * time.Second
 	}
 	s.Conn = c
-	//s.LR.R = c
-	//s.LR.N = 1000
-	s.Reader = textproto.NewReader(bufio.NewReader(c))
+	s.Reader = textproto.NewReader(bufio.NewReader(io.LimitReader(c, 1000)))
 }
 
 type Config struct {
