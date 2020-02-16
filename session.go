@@ -79,7 +79,7 @@ func (s *Stream) SendCommand(cmd, arg string) {
 	}
 }
 
-// Read a (possibly multi-line) response from a server
+// Read a (possibly multi-line) response from a server. Like readresponse, but more permissive.
 func (s *Stream) ReadReply() (code int, lines[] string) {
 	code = -1
 	for {
